@@ -6,7 +6,7 @@ import { loadDocuments, processDocuments } from './loader.js';
  * Ingest documents into the vector store
  */
 export async function ingestDocuments(knowledgeDir, config) {
-  const { chunkSize, chunkOverlap, embeddingModel } = config;
+  const { chunkSize, chunkOverlap } = config;
   
   console.log('\n📚 Loading documents...');
   const documents = loadDocuments(knowledgeDir);
@@ -19,19 +19,22 @@ export async function ingestDocuments(knowledgeDir, config) {
   console.log('\n✂️ Chunking documents...');
   const chunks = processDocuments(documents, chunkSize, chunkOverlap);
 
-  console.log('\n🔢 Generating embeddings...');
+  console.log('\n🔢 Generating embeddings (local Ollama)...');
   const texts = chunks.map(c => c.text);
   
-  // Process in batches of 100
-  const batchSize = 100;
+  // Process in batches
+  const batchSize = 10;
   const allEmbeddings = [];
   
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
-    console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(texts.length/batchSize)}`);
-    const embeddings = await getEmbeddings(batch, embeddingModel);
+    const progress = Math.floor((i / texts.length) * 100);
+    process.stdout.write(`\r   Progress: ${progress}% (${i}/${texts.length})`);
+    
+    const embeddings = await getEmbeddings(batch);
     allEmbeddings.push(...embeddings);
   }
+  console.log(`\r   Progress: 100% (${texts.length}/${texts.length})`);
 
   console.log('\n💾 Storing vectors...');
   vectorStore.clear();
@@ -52,10 +55,10 @@ export async function ingestDocuments(knowledgeDir, config) {
  * Query the knowledge base
  */
 export async function query(question, config) {
-  const { topK, embeddingModel, chatModel } = config;
+  const { topK } = config;
   
   // Get embedding for the question
-  const queryEmbedding = await getEmbedding(question, embeddingModel);
+  const queryEmbedding = await getEmbedding(question);
   
   // Search for relevant chunks
   const results = vectorStore.search(queryEmbedding, topK);
@@ -80,7 +83,7 @@ Be concise and direct in your answers.
 Context:
 ${context}`;
 
-  const answer = await chatCompletion(systemPrompt, question, chatModel);
+  const answer = await chatCompletion(systemPrompt, question);
   
   return {
     answer,

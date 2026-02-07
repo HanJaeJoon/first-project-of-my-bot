@@ -1,88 +1,155 @@
-# Mini RAG Knowledge Base Chatbot
+# Mini RAG Knowledge Base Chatbot (Local)
 
-개인 문서 기반 RAG(Retrieval-Augmented Generation) 챗봇. 텍스트/마크다운 파일을 지식 베이스로 저장하고, 질문에 대해 관련 문서를 검색하여 답변을 생성합니다.
+완전 로컬 RAG 챗봇. Ollama를 사용하여 **API 키 없이** 무료로 동작합니다.
 
 ## Features
 
-- 📚 **Document Ingestion**: `.txt`, `.md` 파일을 청크로 분할하여 임베딩 생성
-- 🔍 **Semantic Search**: 질문과 유사한 문서 청크를 코사인 유사도로 검색
-- 🤖 **RAG Pipeline**: 검색된 컨텍스트 기반 LLM 답변 생성
-- 💾 **Persistent Storage**: JSON 기반 벡터 저장 (외부 DB 불필요)
-- ⚙️ **Configurable**: 환경 변수로 모델, 청크 크기 등 설정 가능
+- 🏠 **100% Local**: 외부 API 없음, 데이터가 로컬에만 저장
+- 🆓 **무료**: Ollama + 오픈소스 모델 사용
+- 🐳 **Docker 지원**: `docker-compose up` 한 줄로 환경 구성
+- 📚 **Document Ingestion**: `.txt`, `.md` 파일 지식 베이스화
+- 🔍 **Semantic Search**: 벡터 유사도 기반 문서 검색
+- ⚙️ **모델 선택 가능**: Qwen2.5, Llama3.1, Gemma3 등
+
+## Requirements
+
+- Docker & Docker Compose (권장)
+- 또는 [Ollama](https://ollama.ai) 직접 설치
+- RAM: 최소 8GB (16GB 권장)
 
 ## Quick Start
 
-### 1. Install dependencies
+### 1. Start Ollama (Docker)
+
+```bash
+# Ollama 컨테이너 시작
+docker-compose up -d
+
+# 모델 다운로드 (최초 1회)
+docker exec -it ollama ollama pull qwen2.5:3b
+docker exec -it ollama ollama pull nomic-embed-text
+```
+
+또는 스크립트 사용:
+```bash
+chmod +x scripts/setup-models.sh
+./scripts/setup-models.sh
+```
+
+### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure environment
+### 3. Configure (optional)
 
 ```bash
 cp .env.example .env
-# .env 파일에 OPENAI_API_KEY 입력
+# 필요시 모델 변경
 ```
 
-### 3. Add documents
+### 4. Add documents
 
 `knowledge/` 폴더에 `.txt` 또는 `.md` 파일 추가
 
-### 4. Ingest documents
+### 5. Ingest & Chat
 
 ```bash
+# 문서 임베딩
 npm run ingest
-```
 
-### 5. Start chatting
-
-```bash
+# 챗봇 시작
 npm start
-# or
-npm run chat
 ```
+
+## Available Models
+
+### LLM (Chat)
+
+| Model | Size | RAM | 특징 |
+|-------|------|-----|------|
+| `qwen2.5:3b` | ~2GB | 4GB+ | 빠름, 한국어 OK |
+| `qwen2.5:7b` | ~4GB | 8GB+ | 균형 |
+| `llama3.1:8b` | ~5GB | 8GB+ | 영어 우수 |
+| `gemma3:4b` | ~3GB | 6GB+ | Google 모델 |
+| `qwen2.5:14b` | ~8GB | 16GB+ | 고품질 |
+
+### Embedding
+
+| Model | Size | 특징 |
+|-------|------|------|
+| `nomic-embed-text` | ~275MB | 추천, 빠름 |
+| `mxbai-embed-large` | ~670MB | 고품질 |
 
 ## Project Structure
 
 ```
 ├── index.js              # CLI entry point
+├── docker-compose.yml    # Ollama 컨테이너
+├── scripts/
+│   └── setup-models.sh   # 모델 다운로드 스크립트
 ├── src/
 │   ├── loader.js         # Document loading & chunking
-│   ├── embeddings.js     # OpenAI embeddings & chat
-│   ├── vectorStore.js    # Simple vector store with cosine similarity
-│   └── rag.js            # RAG pipeline (ingest + query)
-├── knowledge/            # Your documents go here
-├── data/                 # Vector storage (auto-generated)
-├── .env.example          # Environment template
-└── package.json
+│   ├── embeddings.js     # Ollama API wrapper
+│   ├── vectorStore.js    # Vector store (cosine similarity)
+│   └── rag.js            # RAG pipeline
+├── knowledge/            # Your documents
+├── data/                 # Vector storage
+└── .env.example
 ```
-
-## Configuration
-
-`.env` 파일에서 설정 가능:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENAI_API_KEY` | - | OpenAI API 키 (필수) |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | 임베딩 모델 |
-| `CHAT_MODEL` | `gpt-4o-mini` | 채팅 모델 |
-| `CHUNK_SIZE` | `500` | 텍스트 청크 크기 (문자 수) |
-| `CHUNK_OVERLAP` | `50` | 청크 간 오버랩 |
-| `TOP_K` | `3` | 검색 시 반환할 청크 수 |
 
 ## Commands
 
-Interactive mode에서 사용 가능한 명령어:
+```bash
+npm start          # 챗봇 시작
+npm run ingest     # 문서 임베딩
+npm run check      # Ollama 상태 확인
+npm run docker:up  # Ollama 컨테이너 시작
+npm run docker:down # 컨테이너 중지
+```
+
+### Chat Commands
 
 - `/stats` - 지식 베이스 통계
 - `/sources` - 로드된 문서 목록
+- `/check` - Ollama 연결 상태
 - `/quit` - 종료
 
-## How It Works
+## Configuration
 
-1. **Ingest**: 문서를 청크로 분할 → OpenAI로 임베딩 생성 → JSON 파일에 저장
-2. **Query**: 질문 임베딩 생성 → 유사 청크 검색 (cosine similarity) → LLM에 컨텍스트와 함께 전달 → 답변 생성
+`.env` 파일:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 서버 주소 |
+| `EMBEDDING_MODEL` | `nomic-embed-text` | 임베딩 모델 |
+| `CHAT_MODEL` | `qwen2.5:3b` | LLM 모델 |
+| `CHUNK_SIZE` | `500` | 청크 크기 |
+| `TOP_K` | `3` | 검색 결과 수 |
+
+## GPU Acceleration
+
+NVIDIA GPU 사용 시 `docker-compose.yml`에서 주석 해제:
+
+```yaml
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: all
+          capabilities: [gpu]
+```
+
+## AnythingLLM (Optional)
+
+웹 UI가 필요하면 `docker-compose.yml`에서 AnythingLLM 주석 해제 후:
+
+```bash
+docker-compose up -d
+# http://localhost:3001 접속
+```
 
 ## License
 
