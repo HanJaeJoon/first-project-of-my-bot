@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   ollama:
     image: ollama/ollama:latest
@@ -19,19 +17,19 @@ services:
     #           capabilities: [gpu]
 
   # AnythingLLM (선택사항 - 웹 UI 원할 경우)
-  # anythingllm:
-  #   image: mintplexlabs/anythingllm:latest
-  #   container_name: anythingllm
-  #   ports:
-  #     - "3001:3001"
-  #   volumes:
-  #     - anythingllm_data:/app/server/storage
-  #   environment:
-  #     - STORAGE_DIR=/app/server/storage
-  #   depends_on:
-  #     - ollama
-  #   restart: unless-stopped
+  anythingllm:
+    image: mintplexlabs/anythingllm:latest
+    container_name: anythingllm
+    ports:
+      - "3001:3001"
+    volumes:
+      - anythingllm_data:/app/server/storage
+    environment:
+      - STORAGE_DIR=/app/server/storage
+    depends_on:
+      - ollama
+    restart: unless-stopped
 
 volumes:
   ollama_data:
-  # anythingllm_data:
+  anythingllm_data:
