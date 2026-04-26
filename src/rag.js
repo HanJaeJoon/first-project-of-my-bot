@@ -1,96 +1,78 @@
-import { getEmbedding, getEmbeddings, chatCompletion } from './embeddings.js';
+import { config } from './config.js';
+import { embed, embedMany, chat } from './ollama.js';
 import { vectorStore } from './vectorStore.js';
-import { loadDocuments, processDocuments } from './loader.js';
+import { loadDocuments } from './loader.js';
+import { processDocuments } from './chunker.js';
 
-/**
- * Ingest documents into the vector store
- */
-export async function ingestDocuments(knowledgeDir, config) {
-  const { chunkSize, chunkOverlap } = config;
-  
-  console.log('\n📚 Loading documents...');
-  const documents = loadDocuments(knowledgeDir);
-  
-  if (documents.length === 0) {
-    console.log('No documents found. Add .txt or .md files to the knowledge/ folder.');
-    return;
-  }
+const SYSTEM_PROMPT_KO = `당신은 주어진 컨텍스트만 근거로 답변하는 한국어 어시스턴트입니다.
+규칙:
+- 컨텍스트에 없는 내용은 "제공된 자료에서 찾을 수 없습니다."라고 답하세요.
+- 가능하면 출처(파일명)를 인용하세요.
+- 답변은 간결하고 정확하게, 한국어로 작성합니다.`;
 
-  console.log('\n✂️ Chunking documents...');
-  const chunks = processDocuments(documents, chunkSize, chunkOverlap);
-
-  console.log('\n🔢 Generating embeddings (local Ollama)...');
-  const texts = chunks.map(c => c.text);
-  
-  // Process in batches
-  const batchSize = 10;
-  const allEmbeddings = [];
-  
-  for (let i = 0; i < texts.length; i += batchSize) {
-    const batch = texts.slice(i, i + batchSize);
-    const progress = Math.floor((i / texts.length) * 100);
-    process.stdout.write(`\r   Progress: ${progress}% (${i}/${texts.length})`);
-    
-    const embeddings = await getEmbeddings(batch);
-    allEmbeddings.push(...embeddings);
-  }
-  console.log(`\r   Progress: 100% (${texts.length}/${texts.length})`);
-
-  console.log('\n💾 Storing vectors...');
-  vectorStore.clear();
-  
-  const items = chunks.map((chunk, i) => ({
-    ...chunk,
-    embedding: allEmbeddings[i]
-  }));
-  
-  vectorStore.add(items);
-  
-  console.log('\n✅ Ingestion complete!');
-  const stats = vectorStore.stats();
-  console.log(`   - ${stats.totalChunks} chunks from ${stats.sourceCount} documents`);
+function buildUserPrompt(question, results) {
+  const ctx = results
+    .map((r, i) => `[${i + 1}] (출처: ${r.source})\n${r.text}`)
+    .join('\n\n---\n\n');
+  return `# 컨텍스트\n${ctx}\n\n# 질문\n${question}`;
 }
 
-/**
- * Query the knowledge base
- */
-export async function query(question, config) {
-  const { topK } = config;
-  
-  // Get embedding for the question
-  const queryEmbedding = await getEmbedding(question);
-  
-  // Search for relevant chunks
-  const results = vectorStore.search(queryEmbedding, topK);
-  
+export async function ingestDocuments(knowledgeDir = config.knowledgeDir) {
+  console.log('\nLoading documents...');
+  const documents = loadDocuments(knowledgeDir);
+  if (documents.length === 0) {
+    console.log(`No documents in ${knowledgeDir}. Add .txt or .md files.`);
+    return { ingested: 0 };
+  }
+  console.log(`  ${documents.length} files`);
+
+  console.log('\nChunking...');
+  const chunks = processDocuments(documents, config.chunkSize, config.chunkOverlap);
+  console.log(`  ${chunks.length} chunks`);
+
+  console.log(`\nEmbedding (${config.embeddingModel}, concurrency=${config.embedConcurrency})...`);
+  const embeddings = await embedMany(
+    chunks.map((c) => c.text),
+    {
+      onProgress: (done, total) => {
+        const pct = Math.floor((done / total) * 100);
+        process.stdout.write(`\r  ${pct}% (${done}/${total})`);
+      },
+    }
+  );
+  process.stdout.write('\n');
+
+  vectorStore.replace(chunks.map((c, i) => ({ ...c, embedding: embeddings[i] })));
+  const stats = vectorStore.stats();
+  console.log(`\nIngested: ${stats.totalChunks} chunks from ${stats.sourceCount} sources.`);
+  return { ingested: stats.totalChunks };
+}
+
+export async function query(question, { stream = config.chatStream, onToken } = {}) {
+  const queryEmbedding = await embed(question);
+  const results = vectorStore.search(queryEmbedding, config.topK);
+
   if (results.length === 0) {
     return {
-      answer: "I don't have any knowledge base loaded. Please run ingestion first.",
-      sources: []
+      answer: '지식 베이스가 비어있습니다. 먼저 `npm run ingest` 를 실행하세요.',
+      sources: [],
     };
   }
 
-  // Build context from retrieved chunks
-  const context = results.map((r, i) => 
-    `[Source: ${r.source}]\n${r.text}`
-  ).join('\n\n---\n\n');
+  const userPrompt = buildUserPrompt(question, results);
+  const answer = await chat({
+    system: SYSTEM_PROMPT_KO,
+    user: userPrompt,
+    stream,
+    onToken,
+  });
 
-  // Generate answer using LLM
-  const systemPrompt = `You are a helpful assistant that answers questions based on the provided context.
-Use ONLY the information from the context to answer. If the context doesn't contain enough information, say so.
-Be concise and direct in your answers.
-
-Context:
-${context}`;
-
-  const answer = await chatCompletion(systemPrompt, question);
-  
   return {
     answer,
-    sources: results.map(r => ({
+    sources: results.map((r) => ({
       source: r.source,
       score: r.score.toFixed(3),
-      preview: r.text.slice(0, 100) + '...'
-    }))
+      preview: r.text.slice(0, 120),
+    })),
   };
 }

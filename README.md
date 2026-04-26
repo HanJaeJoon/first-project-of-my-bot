@@ -1,160 +1,105 @@
-# Mini RAG Knowledge Base Chatbot (Local)
+# Mini RAG Knowledge Base Chatbot (Local, Korean)
 
-완전 로컬 RAG 챗봇. Ollama를 사용하여 **API 키 없이** 무료로 동작합니다.
+완전 로컬에서 동작하는 한국어 RAG 챗봇. Ollama + qwen2.5 + bge-m3 조합으로 **API 키 없이** 무료로 사용한다.
 
 ## Features
 
-- 🏠 **100% Local**: 외부 API 없음, 데이터가 로컬에만 저장
-- 🆓 **무료**: Ollama + 오픈소스 모델 사용
-- 🐳 **Docker 지원**: `docker-compose up` 한 줄로 환경 구성
-- 📚 **Document Ingestion**: `.txt`, `.md` 파일 지식 베이스화
-- 🔍 **Semantic Search**: 벡터 유사도 기반 문서 검색
-- ⚙️ **모델 선택 가능**: Qwen2.5, Llama3.1, Gemma3 등
+- 100% Local — 외부 API 없음, 모든 데이터가 로컬에 저장
+- 한국어 인식 chunker — 문장 경계(`다.`, `요.`, `?` 등)를 살려 청킹
+- 스트리밍 응답 — 토큰 단위로 실시간 출력
+- 동시 임베딩 요청 — 인제스트 속도 향상
 
 ## Requirements
 
 - Docker & Docker Compose (권장)
 - 또는 [Ollama](https://ollama.ai) 직접 설치
-- RAM: 최소 8GB (16GB 권장)
+- RAM: 8GB 이상 (qwen2.5:7b 기준 16GB 권장)
 
 ## Quick Start
 
-### 1. Start Ollama (Docker)
-
 ```bash
-# Ollama 컨테이너 시작
-docker-compose up -d
+# 1. Ollama 컨테이너 시작 (볼륨 포함 초기화)
+npm run docker:reset
 
-# 모델 다운로드 (최초 1회)
-docker exec -it ollama ollama pull qwen2.5:3b
-docker exec -it ollama ollama pull nomic-embed-text
-```
+# 2. 모델 다운로드 (최초 1회, .env 의 모델명을 사용)
+npm run setup:models
 
-또는 스크립트 사용:
-```bash
-chmod +x scripts/setup-models.sh
-./scripts/setup-models.sh
-```
-
-### 2. Install dependencies
-
-```bash
+# 3. 의존성 설치
 npm install
-```
 
-### 3. Configure (optional)
-
-```bash
+# 4. 환경 설정 (선택)
 cp .env.example .env
-# 필요시 모델 변경
-```
 
-### 4. Add documents
-
-`knowledge/` 폴더에 `.txt` 또는 `.md` 파일 추가
-
-### 5. Ingest & Chat
-
-```bash
-# 문서 임베딩
+# 5. knowledge/ 폴더에 .txt / .md 추가 후 인제스트
 npm run ingest
 
-# 챗봇 시작
+# 6. 챗 시작
 npm start
 ```
 
-## Available Models
+## Models (qwen 계열 + bge-m3)
 
-### LLM (Chat)
-
-| Model | Size | RAM | 특징 |
-|-------|------|-----|------|
-| `qwen2.5:3b` | ~2GB | 4GB+ | 빠름, 한국어 OK |
-| `qwen2.5:7b` | ~4GB | 8GB+ | 균형 |
-| `llama3.1:8b` | ~5GB | 8GB+ | 영어 우수 |
-| `gemma3:4b` | ~3GB | 6GB+ | Google 모델 |
-| `qwen2.5:14b` | ~8GB | 16GB+ | 고품질 |
-
-### Embedding
-
-| Model | Size | 특징 |
-|-------|------|------|
-| `nomic-embed-text` | ~275MB | 추천, 빠름 |
-| `mxbai-embed-large` | ~670MB | 고품질 |
+| 용도 | 모델 | 크기 | 특징 |
+|------|------|------|------|
+| 임베딩 | `bge-m3` | ~1.2GB | 한국어 강력, multilingual |
+| LLM (기본) | `qwen2.5:7b` | ~4.7GB | 한국어/리소스 균형 |
+| LLM (고품질) | `qwen2.5:14b` | ~9GB | 16GB+ RAM |
+| LLM (저사양) | `qwen2.5:3b` | ~2GB | 빠른 응답 |
 
 ## Project Structure
 
 ```
-├── index.js              # CLI entry point
-├── docker-compose.yml    # Ollama 컨테이너
-├── scripts/
-│   └── setup-models.sh   # 모델 다운로드 스크립트
-├── src/
-│   ├── loader.js         # Document loading & chunking
-│   ├── embeddings.js     # Ollama API wrapper
-│   ├── vectorStore.js    # Vector store (cosine similarity)
-│   └── rag.js            # RAG pipeline
-├── knowledge/            # Your documents
-├── data/                 # Vector storage
-└── .env.example
+├── index.js                # 엔트리 (얇은 wrapper)
+├── docker-compose.yml      # Ollama 단일 서비스
+├── scripts/setup-models.sh # 모델 pull 스크립트
+└── src/
+    ├── config.js           # 환경 변수 로딩
+    ├── ollama.js           # Ollama API (embed / chat / status)
+    ├── chunker.js          # 한국어 문장 단위 청커
+    ├── loader.js           # 파일 로더 (재귀)
+    ├── vectorStore.js      # cosine similarity, JSON 영속
+    ├── rag.js              # 인제스트 / 질의 파이프라인
+    └── cli.js              # CLI / 스트리밍 출력
 ```
 
 ## Commands
 
 ```bash
-npm start          # 챗봇 시작
-npm run ingest     # 문서 임베딩
-npm run check      # Ollama 상태 확인
-npm run docker:up  # Ollama 컨테이너 시작
-npm run docker:down # 컨테이너 중지
+npm start            # 챗 시작 (= node index.js)
+npm run ingest       # knowledge/ 인제스트
+npm run check        # Ollama 상태 + 모델 확인
+npm run docker:up    # Ollama 컨테이너 기동
+npm run docker:down  # 컨테이너 중지
+npm run docker:reset # down -v && up -d (볼륨 포함 초기화)
+npm run setup:models # .env 의 모델 pull
 ```
 
-### Chat Commands
+### Chat 내 명령
 
-- `/stats` - 지식 베이스 통계
-- `/sources` - 로드된 문서 목록
-- `/check` - Ollama 연결 상태
-- `/quit` - 종료
+- `/stats` — 청크/소스 수
+- `/sources` — 인덱싱된 파일 목록
+- `/check` — Ollama/모델 상태 재점검
+- `/quit` — 종료
 
-## Configuration
-
-`.env` 파일:
+## Configuration (`.env`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 서버 주소 |
-| `EMBEDDING_MODEL` | `nomic-embed-text` | 임베딩 모델 |
-| `CHAT_MODEL` | `qwen2.5:3b` | LLM 모델 |
-| `CHUNK_SIZE` | `500` | 청크 크기 |
-| `TOP_K` | `3` | 검색 결과 수 |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 서버 |
+| `EMBEDDING_MODEL` | `bge-m3` | 임베딩 모델 |
+| `CHAT_MODEL` | `qwen2.5:7b` | LLM 모델 |
+| `CHUNK_SIZE` | `700` | 청크 크기(문자) |
+| `CHUNK_OVERLAP` | `100` | 청크 overlap |
+| `TOP_K` | `4` | 검색 결과 수 |
+| `CHAT_TEMPERATURE` | `0.3` | 응답 무작위성 |
+| `CHAT_MAX_TOKENS` | `1024` | 응답 최대 토큰 |
+| `CHAT_STREAM` | `true` | 스트리밍 여부 |
+| `EMBED_CONCURRENCY` | `4` | 임베딩 동시 요청 수 |
 
-## GPU Acceleration
+## GPU
 
-NVIDIA GPU 사용 시 `docker-compose.yml`에서 주석 해제:
-
-```yaml
-deploy:
-  resources:
-    reservations:
-      devices:
-        - driver: nvidia
-          count: all
-          capabilities: [gpu]
-```
-
-## AnythingLLM (Optional)
-
-웹 UI가 필요하면 `docker-compose.yml`에서 AnythingLLM 주석 해제 후:
-
-```bash
-docker-compose up -d
-# http://localhost:3001 접속
-```
+NVIDIA GPU 사용 시 `docker-compose.yml` 의 `deploy:` 블록 주석을 해제.
 
 ## License
 
 MIT
-
----
-
-*Created with help from OpenClaw* ⚡

@@ -1,105 +1,72 @@
-import fs from 'fs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { config } from './config.js';
 
-const DATA_FILE = './data/vectors.json';
+const DATA_FILE = path.join(config.dataDir, 'vectors.json');
 
-/**
- * Simple in-memory vector store with file persistence
- */
+function cosine(a, b) {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    const x = a[i];
+    const y = b[i];
+    dot += x * y;
+    na += x * x;
+    nb += y * y;
+  }
+  const denom = Math.sqrt(na) * Math.sqrt(nb);
+  return denom === 0 ? 0 : dot / denom;
+}
+
 class VectorStore {
   constructor() {
-    this.vectors = [];
+    this.items = [];
     this.load();
   }
 
-  /**
-   * Load vectors from file
-   */
   load() {
     try {
       if (fs.existsSync(DATA_FILE)) {
-        const data = fs.readFileSync(DATA_FILE, 'utf-8');
-        this.vectors = JSON.parse(data);
-        console.log(`Loaded ${this.vectors.length} vectors from store`);
+        this.items = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
       }
-    } catch (error) {
-      console.error('Error loading vectors:', error.message);
-      this.vectors = [];
+    } catch (err) {
+      console.error('vectorStore load error:', err.message);
+      this.items = [];
     }
   }
 
-  /**
-   * Save vectors to file
-   */
   save() {
-    try {
-      fs.writeFileSync(DATA_FILE, JSON.stringify(this.vectors, null, 2));
-      console.log(`Saved ${this.vectors.length} vectors to store`);
-    } catch (error) {
-      console.error('Error saving vectors:', error.message);
-    }
+    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+    fs.writeFileSync(DATA_FILE, JSON.stringify(this.items));
   }
 
-  /**
-   * Add vectors with metadata
-   */
-  add(items) {
-    // items: [{ id, text, source, embedding }]
-    this.vectors.push(...items);
+  replace(items) {
+    this.items = items;
     this.save();
   }
 
-  /**
-   * Clear all vectors
-   */
   clear() {
-    this.vectors = [];
-    this.save();
+    this.replace([]);
   }
 
-  /**
-   * Cosine similarity between two vectors
-   */
-  cosineSimilarity(a, b) {
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-    
-    for (let i = 0; i < a.length; i++) {
-      dotProduct += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-    
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
-
-  /**
-   * Find top-k similar vectors
-   */
-  search(queryEmbedding, topK = 3) {
-    if (this.vectors.length === 0) {
-      return [];
-    }
-
-    const scored = this.vectors.map(item => ({
-      ...item,
-      score: this.cosineSimilarity(queryEmbedding, item.embedding)
+  search(queryEmbedding, topK = 4) {
+    if (this.items.length === 0) return [];
+    const scored = this.items.map((it) => ({
+      ...it,
+      score: cosine(queryEmbedding, it.embedding),
     }));
-
     scored.sort((a, b) => b.score - a.score);
-    
     return scored.slice(0, topK);
   }
 
-  /**
-   * Get store stats
-   */
   stats() {
-    const sources = [...new Set(this.vectors.map(v => v.source))];
+    const sources = [...new Set(this.items.map((v) => v.source))];
     return {
-      totalChunks: this.vectors.length,
-      sources: sources,
-      sourceCount: sources.length
+      totalChunks: this.items.length,
+      sources,
+      sourceCount: sources.length,
     };
   }
 }

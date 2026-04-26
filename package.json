@@ -1,19 +1,20 @@
 {
   "name": "first-project-of-my-bot",
-  "version": "1.0.0",
-  "description": "Mini RAG-based personal knowledge base chatbot (Local Ollama)",
+  "version": "1.1.0",
+  "description": "Mini RAG-based Korean knowledge-base chatbot (local Ollama)",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
     "ingest": "node index.js --ingest",
-    "chat": "node index.js --chat",
+    "chat": "node index.js",
     "check": "node index.js --check",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v && docker compose up -d",
     "setup:models": "bash scripts/setup-models.sh"
   },
-  "keywords": ["rag", "chatbot", "knowledge-base", "ollama", "local-llm"],
+  "keywords": ["rag", "chatbot", "korean", "ollama", "local-llm"],
   "author": "",
   "license": "MIT",
   "dependencies": {
