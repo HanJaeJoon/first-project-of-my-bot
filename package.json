@@ -2,22 +2,41 @@
   "name": "first-project-of-my-bot",
   "version": "1.1.0",
   "description": "Mini RAG-based Korean knowledge-base chatbot (local Ollama)",
-  "main": "index.js",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node index.js",
-    "ingest": "node index.js --ingest",
-    "chat": "node index.js",
-    "check": "node index.js --check",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "ingest": "tsx src/index.ts --ingest",
+    "chat": "tsx src/index.ts",
+    "check": "tsx src/index.ts --check",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v && docker compose up -d",
-    "setup:models": "bash scripts/setup-models.sh"
+    "setup:models": "bash scripts/setup-models.sh",
+    "clean": "rm -rf dist"
   },
-  "keywords": ["rag", "chatbot", "korean", "ollama", "local-llm"],
+  "keywords": [
+    "rag",
+    "chatbot",
+    "korean",
+    "ollama",
+    "local-llm"
+  ],
   "author": "",
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.33.0",
   "dependencies": {
     "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
   }
 }

@@ -8,34 +8,47 @@
 - 한국어 인식 chunker — 문장 경계(`다.`, `요.`, `?` 등)를 살려 청킹
 - 스트리밍 응답 — 토큰 단위로 실시간 출력
 - 동시 임베딩 요청 — 인제스트 속도 향상
+- TypeScript (strict) + pnpm
 
 ## Requirements
 
 - Docker & Docker Compose (권장)
 - 또는 [Ollama](https://ollama.ai) 직접 설치
+- Node.js >= 20, pnpm >= 10
 - RAM: 8GB 이상 (qwen2.5:7b 기준 16GB 권장)
 
 ## Quick Start
 
 ```bash
 # 1. Ollama 컨테이너 시작 (볼륨 포함 초기화)
-npm run docker:reset
+pnpm docker:reset
 
 # 2. 모델 다운로드 (최초 1회, .env 의 모델명을 사용)
-npm run setup:models
+pnpm setup:models
 
 # 3. 의존성 설치
-npm install
+pnpm install
 
 # 4. 환경 설정 (선택)
 cp .env.example .env
 
 # 5. knowledge/ 폴더에 .txt / .md 추가 후 인제스트
-npm run ingest
+pnpm ingest
 
-# 6. 챗 시작
-npm start
+# 6. 챗 시작 (개발 모드, tsx)
+pnpm dev
+
+# 또는 빌드 후 실행
+pnpm build && pnpm start
 ```
+
+## Stack
+
+- **Language**: TypeScript (strict, `noUncheckedIndexedAccess`)
+- **Runtime**: Node.js >= 20 (ESM)
+- **Package manager**: pnpm 10
+- **Dev runner**: `tsx`
+- **Build**: `tsc` → `dist/`
 
 ## Models (qwen 계열 + bge-m3)
 
@@ -49,29 +62,35 @@ npm start
 ## Project Structure
 
 ```
-├── index.js                # 엔트리 (얇은 wrapper)
+├── tsconfig.json           # TypeScript 설정 (strict, ES2022)
 ├── docker-compose.yml      # Ollama 단일 서비스
 ├── scripts/setup-models.sh # 모델 pull 스크립트
+├── dist/                   # 빌드 산출물 (tsc)
 └── src/
-    ├── config.js           # 환경 변수 로딩
-    ├── ollama.js           # Ollama API (embed / chat / status)
-    ├── chunker.js          # 한국어 문장 단위 청커
-    ├── loader.js           # 파일 로더 (재귀)
-    ├── vectorStore.js      # cosine similarity, JSON 영속
-    ├── rag.js              # 인제스트 / 질의 파이프라인
-    └── cli.js              # CLI / 스트리밍 출력
+    ├── index.ts            # 엔트리 (얇은 wrapper)
+    ├── cli.ts              # CLI / 스트리밍 출력
+    ├── config.ts           # 환경 변수 로딩
+    ├── ollama.ts           # Ollama API (embed / chat / status)
+    ├── chunker.ts          # 한국어 문장 단위 청커
+    ├── loader.ts           # 파일 로더 (재귀)
+    ├── vectorStore.ts      # cosine similarity, JSON 영속
+    ├── rag.ts              # 인제스트 / 질의 파이프라인
+    └── types.ts            # 공유 타입 정의
 ```
 
 ## Commands
 
 ```bash
-npm start            # 챗 시작 (= node index.js)
-npm run ingest       # knowledge/ 인제스트
-npm run check        # Ollama 상태 + 모델 확인
-npm run docker:up    # Ollama 컨테이너 기동
-npm run docker:down  # 컨테이너 중지
-npm run docker:reset # down -v && up -d (볼륨 포함 초기화)
-npm run setup:models # .env 의 모델 pull
+pnpm dev             # 개발 모드 챗 시작 (tsx, 재컴파일 불필요)
+pnpm build           # TypeScript 컴파일 → dist/
+pnpm typecheck       # 타입 체크만 수행
+pnpm start           # dist/index.js 실행 (빌드 필요)
+pnpm ingest          # knowledge/ 인제스트
+pnpm check           # Ollama 상태 + 모델 확인
+pnpm docker:up       # Ollama 컨테이너 기동
+pnpm docker:down     # 컨테이너 중지
+pnpm docker:reset    # down -v && up -d (볼륨 포함 초기화)
+pnpm setup:models    # .env 의 모델 pull
 ```
 
 ### Chat 내 명령
@@ -95,6 +114,8 @@ npm run setup:models # .env 의 모델 pull
 | `CHAT_MAX_TOKENS` | `1024` | 응답 최대 토큰 |
 | `CHAT_STREAM` | `true` | 스트리밍 여부 |
 | `EMBED_CONCURRENCY` | `4` | 임베딩 동시 요청 수 |
+| `KNOWLEDGE_DIR` | `./knowledge` | 문서 디렉토리 |
+| `DATA_DIR` | `./data` | 벡터 저장 디렉토리 |
 
 ## GPU
 

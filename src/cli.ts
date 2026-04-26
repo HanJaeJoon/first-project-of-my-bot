@@ -1,10 +1,15 @@
 import readline from 'node:readline';
+
 import { config } from './config.js';
 import { status } from './ollama.js';
-import { vectorStore } from './vectorStore.js';
 import { ingestDocuments, query } from './rag.js';
+import { vectorStore } from './vectorStore.js';
 
-export async function checkSetup({ verbose = true } = {}) {
+interface CheckOptions {
+  verbose?: boolean;
+}
+
+export async function checkSetup({ verbose = true }: CheckOptions = {}): Promise<boolean> {
   const s = await status();
   if (!s.ok) {
     if (verbose) {
@@ -15,20 +20,20 @@ export async function checkSetup({ verbose = true } = {}) {
   }
   if (verbose) {
     console.log(`Ollama OK at ${config.ollamaBaseUrl}`);
-    console.log(`  models: ${s.models.join(', ') || '(none)'}`);
+    console.log(`  models: ${s.models?.join(', ') || '(none)'}`);
   }
   if (!s.hasEmbedding && verbose) {
     console.log(`Missing embedding model: ${s.embeddingModel}`);
-    console.log(`  npm run setup:models  또는  ollama pull ${s.embeddingModel}`);
+    console.log(`  pnpm setup:models  또는  ollama pull ${s.embeddingModel}`);
   }
   if (!s.hasChat && verbose) {
     console.log(`Missing chat model: ${s.chatModel}`);
-    console.log(`  npm run setup:models  또는  ollama pull ${s.chatModel}`);
+    console.log(`  pnpm setup:models  또는  ollama pull ${s.chatModel}`);
   }
-  return s.hasEmbedding && s.hasChat;
+  return Boolean(s.hasEmbedding && s.hasChat);
 }
 
-export async function chatMode() {
+export async function chatMode(): Promise<void> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
   const stats = vectorStore.stats();
@@ -38,11 +43,11 @@ export async function chatMode() {
   console.log(
     stats.totalChunks
       ? `  Knowledge : ${stats.totalChunks} chunks / ${stats.sourceCount} sources`
-      : '  Knowledge : (empty — run `npm run ingest`)'
+      : '  Knowledge : (empty — run `pnpm ingest`)',
   );
   console.log('Commands: /quit /stats /sources /check\n');
 
-  const ask = () =>
+  const ask = (): void => {
     rl.question('You> ', async (raw) => {
       const input = raw.trim();
       if (!input) return ask();
@@ -84,16 +89,18 @@ export async function chatMode() {
         }
         console.log();
       } catch (err) {
-        console.error(`\nError: ${err.message}\n`);
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`\nError: ${message}\n`);
       }
       ask();
     });
+  };
 
   ask();
 }
 
-export async function run(argv = process.argv.slice(2)) {
-  const has = (flag) => argv.includes(flag);
+export async function run(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const has = (flag: string): boolean => argv.includes(flag);
 
   if (has('--check')) {
     const ok = await checkSetup();

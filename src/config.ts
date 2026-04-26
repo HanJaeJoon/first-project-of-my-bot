@@ -1,16 +1,18 @@
 import 'dotenv/config';
 
-const num = (v, d) => {
+import type { AppConfig } from './types.js';
+
+const num = (v: string | undefined, d: number): number => {
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
 };
 
-const bool = (v, d) => {
+const bool = (v: string | undefined, d: boolean): boolean => {
   if (v === undefined) return d;
   return /^(1|true|yes|on)$/i.test(String(v));
 };
 
-export const config = Object.freeze({
+export const config: Readonly<AppConfig> = Object.freeze({
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
   embeddingModel: process.env.EMBEDDING_MODEL || 'bge-m3',
   chatModel: process.env.CHAT_MODEL || 'qwen2.5:7b',

@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Logs
 logs/
@@ -21,6 +22,7 @@ coverage/
 # Build
 dist/
 build/
+*.tsbuildinfo
 
 # Environment
 .env
@@ -42,6 +44,8 @@ Thumbs.db
 
 # Optional npm cache
 .npm
+package-lock.json
+yarn.lock
 
 # Optional eslint cache
 .eslintcache
